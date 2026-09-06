@@ -1,5 +1,5 @@
 // Bump this whenever you update index.html / manifest / icons so old caches get cleared.
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const CACHE_NAME = `leap-quiz-${CACHE_VERSION}`;
 
 const APP_SHELL = [
