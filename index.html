@@ -403,6 +403,16 @@
   }
   .weak-list-header span{ text-align:right; }
   .weak-list-header span:first-child{ text-align:left; }
+  .unseen-item{
+    font-size:13px;
+    color:var(--ink);
+    padding:7px 0;
+    border-bottom:1px solid var(--line);
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .unseen-item:last-child{ border-bottom:none; }
   .empty-note{ font-size:13px; color:var(--muted); }
   .note{ font-size:12px; color:var(--muted); margin-top:8px; }
 
@@ -491,15 +501,21 @@
     <div class="btn-row">
       <button class="btn" id="applyRangeBtn">この範囲に絞り込む</button>
       <button class="btn" id="showWeakBtn">単語別の成績を見る</button>
+      <button class="btn" id="showUnseenBtn">未出題の単語を見る</button>
       <button class="btn warn" id="resetBtn">成績をリセット</button>
     </div>
     <div class="note" id="rangeNote"></div>
   </div>
 
   <div class="panel" id="weakPanel" style="display:none;">
-    <h2>単語別の成績（正答率が低い順）</h2>
+    <h2>単語別の成績（番号順）</h2>
     <div class="weak-list-header"><span>単語</span><span>出題</span><span>正答率</span></div>
     <div class="weak-list" id="weakList"></div>
+  </div>
+
+  <div class="panel" id="unseenPanel" style="display:none;">
+    <h2 id="unseenHeading">未出題の単語</h2>
+    <div class="weak-list" id="unseenList"></div>
   </div>
 </div>
 
@@ -519,14 +535,14 @@ const DATA_MAX = WORDS[WORDS.length - 1][0];
    何も設定しない場合は、この端末の localStorage にのみ保存されます。
    ========================================================================= */
 const firebaseConfig = {
-  apiKey:"AIzaSyDoa5VpVIMSHUvKmVP3w1D_Xh0IMC9StG0",
-  authDomain:"leap-9e178.firebaseapp.com",
-  projectId: "leap-9e178",
-  storageBucket: "leap-9e178.firebasestorage.app",
-  messagingSenderId: "762257923419",
-  appId: "1:762257923419:web:ec1455f1a4ef008fc90e7e"
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  projectId: "YOUR_PROJECT",
+  storageBucket: "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
 };
-const SYNC_ID = "okwdcmkodcokksosjshafafayau9282837";
+const SYNC_ID = "change-this-to-your-own-secret-id";
 
 const FIREBASE_CONFIGURED = firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY";
 let db = null;
@@ -924,8 +940,7 @@ function renderWeakList(){
       correct: s.correct,
       rate: Math.round((s.correct / s.asked) * 100)
     }))
-    .sort((a, b) => (a.rate - b.rate) || (b.asked - a.asked))
-    .slice(0, 100);
+    .sort((a, b) => Number(a.no) - Number(b.no));
 
   const box = document.getElementById('weakList');
   if(entries.length === 0){
@@ -942,6 +957,28 @@ function renderWeakList(){
     row.className = 'weak-item';
     row.innerHTML = `<span class="w"></span><span class="a">${asked}回</span><span class="n ${rateClass}">${rate}%</span>`;
     row.querySelector('.w').textContent = `No.${w[0]} ${w[1]}`;
+    box.appendChild(row);
+  });
+}
+
+function renderUnseenList(){
+  const wordStats = stats.wordStats || {};
+  const rangeWords = currentRangeWords();
+  const unseen = rangeWords.filter(w => !wordStats[w[0]] || wordStats[w[0]].asked === 0);
+
+  document.getElementById('unseenHeading').textContent =
+    `未出題の単語（範囲内 ${rangeWords.length}語中 ${unseen.length}語）`;
+
+  const box = document.getElementById('unseenList');
+  if(unseen.length === 0){
+    box.innerHTML = '<div class="empty-note">この範囲の単語はすべて出題済みです。</div>';
+    return;
+  }
+  box.innerHTML = '';
+  unseen.forEach(w => {
+    const row = document.createElement('div');
+    row.className = 'unseen-item';
+    row.textContent = `No.${w[0]} ${w[1]}`;
     box.appendChild(row);
   });
 }
@@ -1022,7 +1059,21 @@ function init(){
     const panel = document.getElementById('weakPanel');
     const showing = panel.style.display !== 'none';
     if(showing){ panel.style.display = 'none'; }
-    else { renderWeakList(); panel.style.display = 'block'; }
+    else {
+      document.getElementById('unseenPanel').style.display = 'none';
+      renderWeakList();
+      panel.style.display = 'block';
+    }
+  });
+  document.getElementById('showUnseenBtn').addEventListener('click', () => {
+    const panel = document.getElementById('unseenPanel');
+    const showing = panel.style.display !== 'none';
+    if(showing){ panel.style.display = 'none'; }
+    else {
+      document.getElementById('weakPanel').style.display = 'none';
+      renderUnseenList();
+      panel.style.display = 'block';
+    }
   });
 
   document.addEventListener('keydown', (e) => {
