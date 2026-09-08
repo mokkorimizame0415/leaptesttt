@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LEAP 単語カードv1.10</title>
+<title>LEAP 単語カード</title>
 <link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#15131C">
 <meta name="mobile-web-app-capable" content="yes">
@@ -268,6 +268,11 @@
     color:var(--muted);
     margin:0 0 22px;
   }
+  .info-panel .round-toggle{
+    justify-content:center;
+    margin:0 0 22px;
+    text-align:left;
+  }
   .cta-btn{
     border:none;
     border-radius:14px;
@@ -425,7 +430,7 @@
 <body>
 <div id="app">
   <header>
-    <h1>LEAP 単語カードv1.10</h1>
+    <h1>LEAP 単語カード</h1>
     <div class="lifetime" id="lifetimeStats">読み込み中…</div>
   </header>
 
@@ -450,6 +455,10 @@
     <div class="big-emoji">🔁</div>
     <h2>周回モード</h2>
     <p id="roundSetupDesc">指定した範囲の単語を、間違えた単語がなくなるまで何度も周回します。</p>
+    <label class="toggle-row round-toggle">
+      <input type="checkbox" id="roundWeakOnly">
+      苦手な単語のみで周回する（範囲内で過去に間違えたことがある単語）
+    </label>
     <button class="cta-btn" id="startRoundBtn">この範囲で周回スタート</button>
   </div>
 
@@ -535,14 +544,14 @@ const DATA_MAX = WORDS[WORDS.length - 1][0];
    何も設定しない場合は、この端末の localStorage にのみ保存されます。
    ========================================================================= */
 const firebaseConfig = {
-  apiKey:"AIzaSyDoa5VpVIMSHUvKmVP3w1D_Xh0IMC9StG0",
-  authDomain:"leap-9e178.firebaseapp.com",
-  projectId: "leap-9e178",
-  storageBucket: "leap-9e178.firebasestorage.app",
-  messagingSenderId: "762257923419",
-  appId: "1:762257923419:web:ec1455f1a4ef008fc90e7e"
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  projectId: "YOUR_PROJECT",
+  storageBucket: "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
 };
-const SYNC_ID = "okwdcmkodcokksosjshafafayau9282837";
+const SYNC_ID = "change-this-to-your-own-secret-id";
 
 const FIREBASE_CONFIGURED = firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY";
 let db = null;
@@ -822,8 +831,37 @@ function updateRoundBar(){
   document.getElementById('roundFill').style.width = pct + '%';
 }
 
+function roundBasePool(){
+  return currentRangeWords();
+}
+
+function computeRoundPool(){
+  const base = roundBasePool();
+  const useWeakOnly = document.getElementById('roundWeakOnly').checked;
+  if(useWeakOnly){
+    const weak = base.filter(w => (stats.wrongCounts[w[0]] || 0) > 0);
+    return { pool: weak.length > 0 ? weak : base, weakCount: weak.length, baseCount: base.length, useWeakOnly };
+  }
+  return { pool: base, weakCount: 0, baseCount: base.length, useWeakOnly };
+}
+
+function updateRoundSetupDesc(){
+  const info = computeRoundPool();
+  const descEl = document.getElementById('roundSetupDesc');
+  if(info.useWeakOnly){
+    if(info.weakCount > 0){
+      descEl.textContent = `苦手な単語のみ（範囲内 ${info.weakCount}語）を対象に、間違えた単語がなくなるまで周回します。`;
+    } else {
+      descEl.textContent = `この範囲（${stats.rangeMin}〜${stats.rangeMax}）にはまだ苦手な単語がありません。範囲内の全${info.baseCount}語で周回します。`;
+    }
+  } else {
+    descEl.textContent = `指定範囲（${stats.rangeMin}〜${stats.rangeMax}・${info.baseCount}語）を、間違えた単語がなくなるまで何度も周回します。`;
+  }
+}
+
 function startRound(){
-  roundPool = currentRangeWords();
+  const info = computeRoundPool();
+  roundPool = info.pool;
   if(roundPool.length === 0){
     document.getElementById('rangeNote').textContent = 'この範囲に単語がありません。範囲を見直してください。';
     return;
@@ -933,9 +971,7 @@ function setMode(next){
     } else {
       document.getElementById('stage').style.display = 'none';
       document.getElementById('judgeRow').style.display = 'none';
-      const count = currentRangeWords().length;
-      document.getElementById('roundSetupDesc').textContent =
-        `指定範囲（${stats.rangeMin}〜${stats.rangeMax}・${count}語）を、間違えた単語がなくなるまで何度も周回します。`;
+      updateRoundSetupDesc();
       document.getElementById('roundSetup').style.display = 'block';
     }
   }
@@ -1053,11 +1089,11 @@ function init(){
   document.getElementById('startRoundBtn').addEventListener('click', startRound);
   document.getElementById('restartRoundBtn').addEventListener('click', () => {
     document.getElementById('roundResult').style.display = 'none';
-    const count = currentRangeWords().length;
-    document.getElementById('roundSetupDesc').textContent =
-      `指定範囲（${stats.rangeMin}〜${stats.rangeMax}・${count}語）を、間違えた単語がなくなるまで何度も周回します。`;
+    updateRoundSetupDesc();
     document.getElementById('roundSetup').style.display = 'block';
   });
+
+  document.getElementById('roundWeakOnly').addEventListener('change', updateRoundSetupDesc);
 
   document.getElementById('applyRangeBtn').addEventListener('click', applyRange);
   document.getElementById('resetBtn').addEventListener('click', resetStats);
